@@ -5,8 +5,12 @@ import numpy as np
 
 from itertools import product
 
+random.seed = 41
+
 PIECE_TO_INDEX = {"p": 0, "k": 1, "b": 2, "r": 3, "Q": 4, "K": 5}
 INDEX_TO_PIECE = {val: key for key, val in PIECE_TO_INDEX.items()}
+
+ALPH_TO_INDEX = {"A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5, "G": 6, "H": 7}
 
 GET_OPPONENT_COLOUR = {"W": "B", "B": "W"}
 
@@ -16,22 +20,86 @@ def rc2str(row, column):
     column_letters = ["A", "B", "C", "D", "E", "F", "G", "H"]
     return column_letters[column] + str(row + 1)
 
+def str2rc(position):
+    return (int(position[1]) - 1, int(ALPH_TO_INDEX[position[0]]))
+
 def on_board(row, column):
     return row >= 0 and row <= 7 and column >= 0 and column <= 7
 
 class GameManager():
-    def __init__(self, n_games = 1):
+    def __init__(self):
         policy_net = load_policy_net()
 
         self.game = Game()
 
-    def play_game(self, p1_strategy : str, p2_strategy):
+    def play_game(self, p1_strategy : str, p2_strategy, verbose = True):
         assert p1_strategy in ALL_STRATEGIES
         assert p2_strategy in ALL_STRATEGIES
 
+        turn = 1 if self.game.p1_colour == "W" else 2
+
+        if verbose:
+                print(self.game)
+
+        while(1):
+            # See available actions, make a move
+            if turn == 1:
+                p1_available_moves = self.game.get_available_moves(player = 1)
+                selected_move = self.select_move(p1_available_moves, p1_strategy, 1)
+                self.make_move(selected_move)
+            elif turn == 2:
+                p2_available_moves = self.game.get_available_moves(player = 2)
+                selected_move = self.select_move(p2_available_moves, p2_strategy, 2)
+                self.make_move(selected_move)
+
+            if verbose:
+                print("Move made " + str(selected_move))
+                print(self.game)
+
+            outcome = self.state_condition()
+            if outcome in ["W", "B", "T"]:
+                break
+
+            # Change whos turn it is
+            turn = 2 if turn == 1 else 1
+
+    # Returns either ["W", "B", "T", "C"]
+    # W: White wins
+    # B: Black wins
+    # T: Tied game
+    # C: Continue
+    def state_condition(self):
+        # If P1 has no king
+        if 1 not in np.unique(self.game.board[-1]):
+            return "W" if self.game.p1_colour == "W" else "B"
+
+        # If P2 has no king
+        if -1 not in np.unique(self.game.board[-1]):
+            return "B" if self.game.p1_colour == "W" else "W"
+
+        return "C"
+        
+    def make_move(self, move):
+        rc1 = str2rc(move[0])
+        rc2 = str2rc(move[1])
+
+        self.game.board[:, rc2[0], rc2[1]] = self.game.board[:, rc1[0], rc1[1]]
+        self.game.board[:, rc1[0], rc1[1]] = 0
+
+    def select_move(self, available_moves, strategy, player_number):
+        if strategy == "random":
+            return random.choice(available_moves)
+        elif strategy == "simple_heuristics":
+            # TODO: These two
+            raise NotImplementedError
+        elif strategy == "vindgod":
+            raise NotImplementedError
+
+    def train_game(self):
+        pass
+
 class Game():
     knight_moves = [(-2, -1), (-2, 1), (-1, 2), (1, 2), (2, -1), (2, 1), (-1, -2), (1, -2)]
-
 
     def __init__(self, p1_colour = None):
         self.p1_colour = p1_colour
@@ -49,9 +117,31 @@ class Game():
         assert player in [1, 2]
 
         if player == 1:
-            return self.__get_available_p1_moves()
+            board = self.board
+            available_actions = self.__get_available_moves(board)
+            return available_actions
         elif player == 2:
-            return self.__get_available_p2_moves()
+            board = self.__get_flipped_board(self.board)
+            available_actions = self.__get_available_moves(board)
+            available_actions =  self.__get_flipped_actions(available_actions)
+            return available_actions
+
+    def __get_flipped_actions(self, actions):
+        out = []
+        for pos_start, pos_end in actions:
+            start_row = 9 - int(pos_start[1])
+            end_row = 9 - int(pos_end[1])
+            out.append((pos_start[0] + str(start_row), pos_end[0] + str(end_row)))
+
+        return out
+
+    def __get_flipped_board(self, board):
+        board = board.copy()
+
+        board = board * -1
+        board = np.flip(board, axis = 1)
+
+        return board
 
     # Internal function 
     def __iteratively_get_linear_translations(self, board, initial_position : tuple, transformation : tuple):
@@ -85,9 +175,8 @@ class Game():
 
         return translations
         
-    
-    def __get_available_p1_moves(self):
-        board = self.board.copy()
+    def __get_available_moves(self, board):
+        board = board.copy()
 
         moves = []
 
@@ -109,7 +198,6 @@ class Game():
             # Can move two on first move?
             if all_pieces[r - 2, c] == 0 and all_pieces[r - 1, c] == 0 and r == 6:
                 moves.append((rc2str(r, c), rc2str(r - 2, c)))
-
 
             # Can a pawn take left?
             if on_board(r - 1, c - 1) and p2_pieces[r - 1, c - 1] == 1:
@@ -329,5 +417,6 @@ class Game():
             out += "\n"
 
         out += "     A  B  C  D  E  F  G  H"
+        out += "\n"
 
         return out
