@@ -1,4 +1,4 @@
-from .model import load_policy_net
+from .model import ChessNet
 
 import random
 import numpy as np
@@ -28,9 +28,9 @@ def on_board(row, column):
 
 class GameManager():
     def __init__(self):
-        policy_net = load_policy_net()
-
         self.game = Game()
+
+        self.policy_net = ChessNet()
 
     def play_game(self, p1_strategy : str, p2_strategy, verbose = True):
         assert p1_strategy in ALL_STRATEGIES
