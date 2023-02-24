@@ -4,7 +4,7 @@ def main():
     game_manager = GameManager()
     print(game_manager.game)
     
-    game_manager.play_game("random", "random")
+    game_manager.play_game("vindgod", "random")
 
 if __name__ == "__main__":
     main()

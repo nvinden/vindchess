@@ -2,6 +2,7 @@ from .model import ChessNet
 
 import random
 import numpy as np
+import torch
 
 from itertools import product
 
@@ -52,6 +53,8 @@ class GameManager():
                 selected_move = self.select_move(p2_available_moves, p2_strategy, 2)
                 self.make_move(selected_move)
 
+            # TODO: Make sure to check that the selected move is indeed valid
+
             if verbose:
                 print("Move made " + str(selected_move))
                 print(self.game)
@@ -93,7 +96,26 @@ class GameManager():
             # TODO: These two
             raise NotImplementedError
         elif strategy == "vindgod":
-            raise NotImplementedError
+            board_float = self.game.board.astype("float32")
+            board_float = np.expand_dims(board_float, 0)
+            _, move_matrix = self.policy_net(board_float)
+
+            #TODO: Instead of just returning top move, implement a search to
+            # do this instead using some sort of strategy with beta-pruning and
+            # searching for best board period
+
+            best_move_index = torch.argmax(move_matrix).item()
+
+            start_move_row = best_move_index // 512
+            start_move_col = (best_move_index // 64) % 8
+
+            end_move_row = (best_move_index // 8) % 8
+            end_move_col = best_move_index % 8
+
+            start = rc2str(start_move_row, start_move_col)
+            end = rc2str(end_move_row, end_move_col)
+
+            return (start, end)
 
     def train_game(self):
         pass
