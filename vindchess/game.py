@@ -100,20 +100,13 @@ class GameManager():
             board_float = np.expand_dims(board_float, 0)
             _, move_matrix = self.policy_net(board_float)
 
-            #TODO: Instead of just returning top move, implement a search to
+            # TODO: Instead of just returning top move, implement a search to
             # do this instead using some sort of strategy with beta-pruning and
             # searching for best board period
 
             best_move_index = torch.argmax(move_matrix).item()
 
-            start_move_row = best_move_index // 512
-            start_move_col = (best_move_index // 64) % 8
-
-            end_move_row = (best_move_index // 8) % 8
-            end_move_col = best_move_index % 8
-
-            start = rc2str(start_move_row, start_move_col)
-            end = rc2str(end_move_row, end_move_col)
+            start, end = self.game.q_index_to_chess_encoding(best_move_index)
 
             return (start, end)
 
@@ -133,9 +126,9 @@ class Game():
 
         self.board = self.create_initial_board()
 
-    # Returns a list of valud moves for the player
+  # Returns a list of valud moves for the player
     # ex: ["a4", "a5"]
-    def get_available_moves(self, player) -> list:
+    def get_available_moves_deprecated(self, player) -> list:
         assert player in [1, 2]
 
         if player == 1:
@@ -146,8 +139,8 @@ class Game():
             board = self.__get_flipped_board(self.board)
             available_actions = self.__get_available_moves(board)
             available_actions =  self.__get_flipped_actions(available_actions)
-            return available_actions
-
+            return available_actions 
+    
     def __get_flipped_actions(self, actions):
         out = []
         for pos_start, pos_end in actions:
@@ -197,8 +190,8 @@ class Game():
 
         return translations
         
-    def __get_available_moves(self, board):
-        board = board.copy()
+    def get_available_moves(self, state):
+        board = state.copy()
 
         moves = []
 
@@ -442,3 +435,60 @@ class Game():
         out += "\n"
 
         return out
+
+    # Takes a game state and returns a unique string key that contains the information
+    # of the game.
+    # This function "unrolls" the board into one dimension, and returns a string of length
+    # 6 * 8 * 8 = 384 length string with 0 -> p2 piece, 1 -> empty, 2 -> p1 piece 
+    def state_to_key(self, state) -> str:
+        reshaped_state = np.reshape(state, newshape=[-1]) + 1
+        out = ''.join(map(str, reshaped_state))
+        return out
+
+    # returns true if the game is over, and false if the game is not
+    def game_ended(self, state) -> bool:
+        # Checking to see if there a king is missing
+        unique_king_values = set(np.unique(state[-1]).tolist())
+        if unique_king_values != {-1, 0, 1}:
+            return True
+
+        # Checking to see if all other pieces are dead
+        unique_other_piece_values = set(np.unique(state[:-1]).tolist())
+        if unique_other_piece_values == {0}:
+            return True
+
+        return False
+
+    def game_reward(self, state) -> float:
+        assert self.game_ended(state) == True
+        # Checking p1 and p2 kings are missing
+        unique_king_values = set(np.unique(state[-1]).tolist())
+
+        # P1 king:
+        if 1 not in unique_king_values:
+            return -1.0
+
+        # P2 king:
+        if -1 not in unique_king_values:
+            return 1.0
+
+        # If both kings are alive, and the game is done, that must mean it
+        # is a tie
+
+        return 0.0
+        
+    def q_index_to_chess_encoding(self, index):
+        start_move_row = index // 512
+        start_move_col = (index // 64) % 8
+
+        end_move_row = (index // 8) % 8
+        end_move_col = index % 8
+
+        start = rc2str(start_move_row, start_move_col)
+        end = rc2str(end_move_row, end_move_col)
+
+        return (start, end)
+
+    def chess_encoding_to_q_index(self, start, end):
+        pass
+

@@ -34,14 +34,20 @@ class ChessNet(nn.Module):
         # Policy with board confidence rating
         self.board_confidence = nn.Linear(self.conv_filter_depth[-1] * 8 * 8, 1)
 
+    # Input (6x8x8) state tensor
     def forward(self, x):
-        x = torch.tensor(x)
+        x = torch.tensor(x, dtype = torch.float32)
+        
+        # Does not have a batch
+        if len(x.shape) == 3:
+            x = x.unsqueeze(0)
+
         for conv_block, conv_skip_block in zip(self.conv_blocks, self.skip_convolutions):
             out = conv_block(x)
             x = F.relu(out + conv_skip_block(x))
 
-        board_conf_out = F.tanh(self.board_confidence(x.view(1, -1)))
-        move_policy_out = F.softmax(self.move_policy_net(x.view(1, -1)))
+        board_conf_out = torch.tanh(self.board_confidence(x.view(1, -1))).squeeze(-1)
+        move_policy_out = F.softmax(self.move_policy_net(x.view(1, -1)), dim = 1)
 
         return board_conf_out, move_policy_out
         
