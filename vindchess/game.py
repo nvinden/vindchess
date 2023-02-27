@@ -150,11 +150,12 @@ class Game():
 
         return out
 
-    def __get_flipped_board(self, board):
+    def get_flipped_board(self, board : np.ndarray):
         board = board.copy()
 
         board = board * -1
-        board = np.flip(board, axis = 1)
+        board = np.flip(board, axis = 1).copy()
+        board = np.flip(board, axis = 2).copy()
 
         return board
 
@@ -316,8 +317,8 @@ class Game():
     def __get_available_p2_moves(self):
         pass
 
-    def get_trad_board(self):
-        board = self.board.copy()
+    def get_trad_board(self, state):
+        board = state.copy()
         non_zero_positions = np.nonzero(board)
 
         board_out = [[".."] * 8 for _ in range(8)]
@@ -484,11 +485,44 @@ class Game():
         end_move_row = (index // 8) % 8
         end_move_col = index % 8
 
-        start = rc2str(start_move_row, start_move_col)
-        end = rc2str(end_move_row, end_move_col)
+        start = rc2str(start_move_col, start_move_row)
+        end = rc2str(end_move_col, end_move_row)
 
         return (start, end)
 
     def chess_encoding_to_q_index(self, start, end):
-        pass
+        sm_row = ALPH_TO_INDEX[start[0]]
+        sm_col = int(start[1]) - 1
+
+        em_row = ALPH_TO_INDEX[end[0]]
+        em_col = int(end[1]) - 1
+
+        return (8**3 * sm_row) + (8**2 * sm_col) + (8 * em_row) + em_col
+
+    def next_state(self, start_state : np.ndarray, move : tuple) -> np.ndarray:
+        end_state = start_state.copy()
+
+        rc1 = str2rc(move[0])
+        rc2 = str2rc(move[1])
+
+        end_state[:, rc2[0], rc2[1]] = end_state[:, rc1[0], rc1[1]]
+        end_state[:, rc1[0], rc1[1]] = 0
+
+        return end_state
+
+    def print_state(self, state):
+        out = ""
+
+        trad_board = self.get_trad_board(state)
+
+        for row_number, row in enumerate(trad_board):
+            out += str(row_number + 1) + ")  "
+            for col in row:
+                out += col + " "
+            out += "\n"
+
+        out += "     A  B  C  D  E  F  G  H"
+        out += "\n"
+
+        return out
 
